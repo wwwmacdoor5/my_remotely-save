@@ -253,23 +253,6 @@ export const checkProRunnableAndFixInplace = async (
 
   const errorMsgs = [];
 
-  // check for smart_conflict
-  if (config.conflictAction === "smart_conflict") {
-    if (
-      config.pro.enabledProFeatures.filter(
-        (x) => x.featureName === "feature-smart_conflict"
-      ).length === 1
-    ) {
-      // good to go
-    } else {
-      errorMsgs.push(
-        `You're trying to use "smart conflict" PRO feature but you haven't subscribe to it.`
-      );
-    }
-  } else {
-    // good to go
-  }
-
   const toChecked: {
     feature: PRO_FEATURE_TYPE;
     service: SUPPORTED_SERVICES_TYPE;

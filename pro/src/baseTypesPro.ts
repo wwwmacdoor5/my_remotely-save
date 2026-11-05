@@ -26,7 +26,6 @@ export const PRO_CLIENT_ID = global.DEFAULT_REMOTELYSAVE_CLIENT_ID;
 export const PRO_WEBSITE = global.DEFAULT_REMOTELYSAVE_WEBSITE;
 
 export type PRO_FEATURE_TYPE =
-  | "feature-smart_conflict"
   | "feature-onedrive_full"
   | "feature-google_drive"
   | "feature-box"

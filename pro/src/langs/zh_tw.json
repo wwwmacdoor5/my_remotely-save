@@ -1,6 +1,6 @@
 {
-  "settings_conflictaction_smart_conflict": "智慧處理衝突 (PRO) (beta)",
-  "settings_conflictaction_smart_conflict_desc": "<p><strong>！！這是 PRO（付費）功能! 您需要線上賬號來使用此功能！！</strong>（<a href=\"#settings-pro\">向下滑</a>可以看到 PRO 賬號的更多資訊。）</p><p><ul><li>小 markdown 檔案，本外掛嘗試使用 diff3 演算法合併它；</li><li>對於大檔案或非 markdown 檔案，本外掛嘗試改名字並均進行儲存。</li></ul></p><p><strong>請注意先手動備份 vault 檔案再用此功能！</strong></p>",
+  "settings_conflictaction_smart_conflict": "智慧處理衝突 (beta)",
+  "settings_conflictaction_smart_conflict_desc": "<p><ul><li>小 markdown 檔案，本外掛嘗試使用 diff3 演算法合併它；</li><li>對於大檔案或非 markdown 檔案，本外掛嘗試改名字並均進行儲存。</li></ul></p><p><strong>請注意先手動備份 vault 檔案再用此功能！</strong></p>",
 
   "protocol_pro_connecting": "正在連線",
   "protocol_pro_connect_manualinput_succ": "連線成功",

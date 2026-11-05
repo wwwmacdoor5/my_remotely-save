@@ -252,6 +252,7 @@ export type DecisionTypeForMixedEntity =
   | "conflict_created_then_keep_remote"
   | "conflict_created_then_smart_conflict"
   | "conflict_created_then_do_nothing"
+  | "conflict_modified_then_do_nothing"
   | "conflict_modified_then_keep_local"
   | "conflict_modified_then_keep_remote"
   | "conflict_modified_then_smart_conflict"

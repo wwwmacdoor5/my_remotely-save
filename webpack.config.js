@@ -77,7 +77,12 @@ module.exports = {
       },
       {
         test: /\.tsx?$/,
-        use: "ts-loader",
+        use: {
+          loader: "ts-loader",
+          options: {
+            transpileOnly: true,
+          },
+        },
         exclude: /node_modules/,
       },
       {
@@ -95,6 +100,10 @@ module.exports = {
   resolve: {
     extensions: [".tsx", ".ts", ".js"],
     mainFields: ["browser", "module", "main"],
+    alias: {
+      "node:url": require.resolve("url/"),
+      "clean-stack": path.resolve(__dirname, "src/clean-stack-stub.js"),
+    },
     fallback: {
       // assert: require.resolve("assert"),
       // buffer: require.resolve("buffer/"),
@@ -121,6 +130,7 @@ module.exports = {
       // timers: require.resolve("timers-browserify"),
       tls: false,
       // tty: require.resolve("tty-browserify"),
+      "node:url": require.resolve("url/"),
       url: require.resolve("url/"),
       // util: require.resolve("util"),
       // vm: require.resolve("vm-browserify"),

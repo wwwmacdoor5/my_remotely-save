@@ -1,6 +1,6 @@
 {
-  "settings_conflictaction_smart_conflict": "Smart Conflict (PRO) (beta)",
-  "settings_conflictaction_smart_conflict_desc": "<p><strong>!!It's a PRO feature! You need an online account for this feature!!</strong>(<a href=\"#settings-pro\">scroll down</a> for more info about PRO account.)</p><p><ul><li>For small markdown files, the plugin tries to merge them with diff3 algorithm.</li><li>For large files or not-markdown files, the plugin saves both files by renaming them.</li></ul></p><p><strong>Please manually backup your vaule before using this feature!</strong></p>",
+  "settings_conflictaction_smart_conflict": "Smart Conflict (beta)",
+  "settings_conflictaction_smart_conflict_desc": "<p><ul><li>For small markdown files, the plugin tries to merge them with diff3 algorithm.</li><li>For large files or not-markdown files, the plugin saves both files by renaming them.</li></ul></p><p><strong>Please manually backup your vaule before using this feature!</strong></p>",
 
   "protocol_pro_connecting": "Connectting",
   "protocol_pro_connect_manualinput_succ": "You've connected",
@@ -283,11 +283,11 @@
   "settings_export_azureblobstorage_button": "Export Azure Blob Storage Part",
 
   "settings_cleardupfiles": "Clear Duplicated Files By Smart Conflict",
-  "settings_cleardupfiles_desc": "If you have ever used Smart Conflict (PRO) feature, the plugin may generate duplicated files. <strong>IF YOU ARE SURE THE DUPLICATED FILES ARE NO LONGER NEEDED</strong>, you can clear <strong>ALL</strong> of them locally here.",
+  "settings_cleardupfiles_desc": "If you have ever used Smart Conflict feature, the plugin may generate duplicated files. <strong>IF YOU ARE SURE THE DUPLICATED FILES ARE NO LONGER NEEDED</strong>, you can clear <strong>ALL</strong> of them locally here.",
   "settings_cleardupfiles_button": "Start Scanning",
 
   "settings_pro": "Account (for PRO features)",
-  "settings_pro_tutorial": "<p>Using <stong>basic</strong> features of Remotely Save is <strong>FREE</strong> and do <strong>NOT</strong> need an account.</p><p>However, you will <strong>need</strong> an online account and <strong>PAY</strong> for the <strong>PRO</strong> features such as smart conflict.</p><p>Firstly please click the button to sign up and sign in to the website: <a href=\"https://remotelysave.com\">https://remotelysave.com</a>. Notice: It's different from, and NOT affiliated with Obsidian account.</p><p>Secondly please \"connect\" your local device to your online account.",
+  "settings_pro_tutorial": "<p>Using <stong>basic</strong> features of Remotely Save is <strong>FREE</strong> and do <strong>NOT</strong> need an account.</p><p>However, you will <strong>need</strong> an online account and <strong>PAY</strong> for the <strong>PRO</strong> features such as Google Drive, OneDrive Full, Box, pCloud, Yandex Disk, Koofr, Azure Blob Storage.</p><p>Firstly please click the button to sign up and sign in to the website: <a href=\"https://remotelysave.com\">https://remotelysave.com</a>. Notice: It's different from, and NOT affiliated with Obsidian account.</p><p>Secondly please \"connect\" your local device to your online account.",
   "settings_pro_features": "Features",
   "settings_pro_features_desc": "Here are features you've enabled:<br/>{{{features}}}",
   "settings_pro_features_refresh_button": "Check again",
