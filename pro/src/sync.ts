@@ -4,6 +4,7 @@ import PQueue from "p-queue";
 import XRegExp from "xregexp";
 import type {
   ConflictActionType,
+  DecisionTypeForMixedEntity,
   EmptyFolderCleanType,
   Entity,
   MixedEntity,
@@ -1928,7 +1929,10 @@ export async function syncer(
     step: number,
     everythingOk: boolean
   ) => any,
-  callbackSyncProcess?: any
+  callbackSyncProcess?: any,
+  conflictFunc?: (
+    conflicts: MixedEntity[]
+  ) => Promise<Record<string, DecisionTypeForMixedEntity> | null | undefined>
 ) {
   console.info(`starting sync.`);
   markIsSyncingFunc(true);
@@ -2038,6 +2042,41 @@ export async function syncer(
     );
     profiler?.insert("finish writing sync plan");
     profiler?.insert(`finish step${step} (make plan)`);
+
+    // Resolve content conflicts interactively before any write/delete happens
+    // NOTE: smart_conflict decisions are auto-merged later, NOT shown in modal
+    if (triggerSource !== "dry" && conflictFunc) {
+      const conflictEntities = Object.values(mixedEntityMappings).filter(
+        (entity) =>
+          entity &&
+          entity.decision &&
+          (entity.decision as string).startsWith("conflict_") &&
+          !(
+            (entity.decision as string) ===
+              "conflict_created_then_smart_conflict" ||
+            (entity.decision as string) ===
+              "conflict_modified_then_smart_conflict"
+          )
+      ) as MixedEntity[];
+
+      if (conflictEntities.length > 0) {
+        const resolutions = await conflictFunc(conflictEntities);
+        if (resolutions) {
+          for (const [key, decision] of Object.entries(resolutions)) {
+            if (mixedEntityMappings[key]) {
+              mixedEntityMappings[key].decision = decision;
+            }
+          }
+        }
+        await insertSyncPlanRecordByVault(
+          db,
+          mixedEntityMappings,
+          vaultRandomID,
+          settings.serviceType
+        );
+        profiler?.insert("finish writing resolved sync plan");
+      }
+    }
 
     // The operations above are almost read only and kind of safe.
     // The operations below begins to write or delete (!!!) something.

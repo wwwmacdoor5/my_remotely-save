@@ -242,3 +242,87 @@
 .pro-revoke-auth-button-hide {
   display: none;
 }
+
+.remotely-save-divergent-local {
+  color: var(--text-success, #4ade80);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.remotely-save-divergent-cloud {
+  color: var(--text-error, #f87171);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.remotely-save-divergent-zero {
+  color: var(--text-muted, #9aa0a6);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.remotely-save-conflict-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.remotely-save-conflict-item {
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: var(--background-secondary);
+}
+
+.remotely-save-conflict-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.remotely-save-conflict-path {
+  font-weight: 600;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.remotely-save-conflict-decision {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.remotely-save-conflict-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.remotely-save-conflict-btn {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 0.9em;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-modifier-box-hover);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.remotely-save-conflict-btn.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.remotely-save-conflict-btn:hover {
+  filter: brightness(1.1);
+}
+
+.remotely-save-conflict-done {
+  margin-top: 16px;
+  text-align: center;
+}

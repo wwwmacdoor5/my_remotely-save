@@ -6,7 +6,7 @@ import { FileText, RefreshCcw, RotateCcw, createElement } from "lucide";
 import {
   Events,
   FileSystemAdapter,
-  type Modal,
+  Modal,
   Notice,
   Platform,
   Plugin,
@@ -64,8 +64,10 @@ import {
 } from "../pro/src/fsYandexDisk";
 import { syncer } from "../pro/src/sync";
 import type {
+  DecisionTypeForMixedEntity,
   RemotelySavePluginSettings,
   SyncTriggerSourceType,
+  MixedEntity,
 } from "./baseTypes";
 import {
   COMMAND_CALLBACK,
@@ -103,6 +105,7 @@ import {
   getLastFailedSyncTimeByVault,
   getLastSuccessSyncTimeByVault,
   prepareDBs,
+  readAllSyncPlanRecordTextsByVault,
   upsertLastFailedSyncTimeByVault,
   upsertLastSuccessSyncTimeByVault,
   upsertPluginVersionByVault,
@@ -151,6 +154,7 @@ const DEFAULT_SETTINGS: RemotelySavePluginSettings = {
   syncDirection: "bidirectional",
   obfuscateSettingFile: true,
   enableMobileStatusBar: false,
+  enableUnsyncedChangesIndicator: true,
   encryptionMethod: "unknown",
   profiler: DEFAULT_PROFILER_CONFIG,
   pro: DEFAULT_PRO_CONFIG,
@@ -213,6 +217,128 @@ const getStatusBarShortMsgFromSyncSource = (
   }
 };
 
+class RemotelySaveConflictModal extends Modal {
+  plugin: RemotelySavePlugin;
+  conflicts: MixedEntity[];
+  resolutions: Record<string, DecisionTypeForMixedEntity> = {};
+  private idx = 0;
+  private onCloseResolve?: (res: Record<string, DecisionTypeForMixedEntity>) => void;
+
+  constructor(plugin: RemotelySavePlugin, conflicts: MixedEntity[]) {
+    super(plugin.app);
+    this.plugin = plugin;
+    this.conflicts = conflicts;
+  }
+
+  async openWithResult(): Promise<Record<string, DecisionTypeForMixedEntity>> {
+    return new Promise((resolve) => {
+      this.onCloseResolve = resolve;
+      this.open();
+    });
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    const t = (x: TransItemType, vars?: any) => {
+      return this.plugin.i18n.t(x, vars);
+    };
+
+    contentEl.createEl("h2", { text: t("conflict_resolution_title") });
+    contentEl.createEl("p", {
+      text: t("conflict_resolution_desc", { count: String(this.conflicts.length) }),
+    });
+
+    const listEl = contentEl.createEl("ul");
+    listEl.addClass("remotely-save-conflict-list");
+
+    const renderItem = () => {
+      listEl.empty();
+      if (this.idx >= this.conflicts.length) {
+        this.finish();
+        return;
+      }
+      const entity = this.conflicts[this.idx];
+
+      const itemEl = listEl.createEl("li");
+      itemEl.addClass("remotely-save-conflict-item");
+
+      const infoEl = itemEl.createEl("div", { cls: "remotely-save-conflict-info" });
+      infoEl.createEl("div", {
+        cls: "remotely-save-conflict-path",
+        text: entity.key ?? "",
+      });
+      infoEl.createEl("div", {
+        cls: "remotely-save-conflict-decision",
+        text: entity.decision ?? "",
+      });
+
+      const btnsEl = itemEl.createEl("div", { cls: "remotely-save-conflict-buttons" });
+
+      const btnLocal = btnsEl.createEl("button", {
+        text: t("conflict_keep_local"),
+        cls: "remotely-save-conflict-btn mod-cta",
+      });
+      btnLocal.onclick = () => {
+        if (entity.key) {
+          this.resolutions[entity.key] = "local_is_modified_then_push";
+        }
+        this.idx++;
+        renderItem();
+      };
+
+      const btnRemote = btnsEl.createEl("button", {
+        text: t("conflict_keep_remote"),
+        cls: "remotely-save-conflict-btn",
+      });
+      btnRemote.onclick = () => {
+        if (entity.key) {
+          this.resolutions[entity.key] = "remote_is_modified_then_pull";
+        }
+        this.idx++;
+        renderItem();
+      };
+
+      const btnSkip = btnsEl.createEl("button", {
+        text: t("conflict_skip"),
+        cls: "remotely-save-conflict-btn",
+      });
+      btnSkip.onclick = () => {
+        if (entity.key) {
+          this.resolutions[entity.key] = "conflict_modified_then_do_nothing";
+        }
+        this.idx++;
+        renderItem();
+      };
+    };
+
+    renderItem();
+  }
+
+  private finish() {
+    const { contentEl } = this;
+    contentEl.empty();
+    const t = (x: TransItemType, vars?: any) => {
+      return this.plugin.i18n.t(x, vars);
+    };
+    contentEl.createEl("h2", { text: t("conflict_resolution_done_title") });
+    contentEl.createEl("p", {
+      text: t("conflict_resolution_done_desc"),
+    });
+    const btnClose = contentEl.createEl("button", {
+      text: t("conflict_done"),
+      cls: "mod-cta",
+    });
+    btnClose.onclick = () => this.close();
+  }
+
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+    this.onCloseResolve?.(this.resolutions);
+    this.onCloseResolve = undefined;
+  }
+}
+
 export default class RemotelySavePlugin extends Plugin {
   settings!: RemotelySavePluginSettings;
   db!: InternalDBs;
@@ -230,6 +356,10 @@ export default class RemotelySavePlugin extends Plugin {
   debugServerTemp?: string;
   syncEvent?: Events;
   appContainerObserver?: MutationObserver;
+  divergentStatusBarElement?: HTMLSpanElement;
+  divergentLocalNewerCount: number = 0;
+  divergentCloudNewerCount: number = 0;
+  divergentDebounceTimer?: number;
 
   async syncRun(triggerSource: SyncTriggerSourceType = "manual") {
     let profiler: Profiler | undefined = undefined;
@@ -240,25 +370,7 @@ export default class RemotelySavePlugin extends Plugin {
         this.settings.profiler?.recordSize ?? false
       );
     }
-    const fsLocal = new FakeFsLocal(
-      this.app.vault,
-      this.settings.syncConfigDir ?? false,
-      this.settings.syncBookmarks ?? false,
-      this.app.vault.configDir,
-      this.manifest.id,
-      profiler,
-      this.settings.deleteToWhere ?? "system"
-    );
-    const fsRemote = getClient(
-      this.settings,
-      this.app.vault.getName(),
-      async () => await this.saveSettings()
-    );
-    const fsEncrypt = new FakeFsEncrypt(
-      fsRemote,
-      this.settings.password ?? "",
-      this.settings.encryptionMethod ?? "rclone-base64"
-    );
+    const { fsLocal, fsRemote, fsEncrypt } = this.createSyncFsStack(profiler);
 
     const t = (x: TransItemType, vars?: any) => {
       return this.i18n.t(x, vars);
@@ -504,13 +616,39 @@ export default class RemotelySavePlugin extends Plugin {
       errNotifyFunc,
       ribboonFunc,
       statusBarFunc,
-      callbackSyncProcess
+      callbackSyncProcess,
+      async (conflicts: MixedEntity[]) => {
+        return await this.resolveConflicts(conflicts);
+      }
     );
 
     fsEncrypt.closeResources();
     (profiler as Profiler | undefined)?.clear();
 
     this.syncEvent?.trigger("SYNC_DONE");
+  }
+
+  private createSyncFsStack(profiler: Profiler | undefined) {
+    const fsLocal = new FakeFsLocal(
+      this.app.vault,
+      this.settings.syncConfigDir ?? false,
+      this.settings.syncBookmarks ?? false,
+      this.app.vault.configDir,
+      this.manifest.id,
+      profiler,
+      this.settings.deleteToWhere ?? "system"
+    );
+    const fsRemote = getClient(
+      this.settings,
+      this.app.vault.getName(),
+      async () => await this.saveSettings()
+    );
+    const fsEncrypt = new FakeFsEncrypt(
+      fsRemote,
+      this.settings.password ?? "",
+      this.settings.encryptionMethod ?? "rclone-base64"
+    );
+    return { fsLocal, fsRemote, fsEncrypt };
   }
 
   async onload() {
@@ -1182,6 +1320,39 @@ export default class RemotelySavePlugin extends Plugin {
         (Platform.isMobile && this.settings.enableMobileStatusBar)) &&
       this.settings.enableStatusBarInfo === true
     ) {
+      // Create Divergent Changes Status Bar Item (before sync text)
+      const divergentStatusBarItem = this.addStatusBarItem();
+      this.divergentStatusBarElement =
+        divergentStatusBarItem.createEl("span");
+      this.divergentStatusBarElement.setAttribute(
+        "data-tooltip-position",
+        "top"
+      );
+      this.divergentStatusBarElement.setAttribute("aria-label", "");
+
+      // recompute divergent changes on vault file changes (debounced 3s)
+      this.registerEvent(
+        this.app.vault.on("modify", this._divergentOnSaveEvent)
+      );
+      this.registerEvent(
+        this.app.vault.on("create", this._divergentOnSaveEvent)
+      );
+      this.registerEvent(
+        this.app.vault.on("delete", this._divergentOnSaveEvent)
+      );
+      this.registerEvent(
+        this.app.vault.on("rename", this._divergentOnSaveEvent)
+      );
+
+      // reset divergent changes after any sync completes
+      this.registerEvent(
+        this.syncEvent.on("SYNC_DONE", async () => {
+          this.divergentLocalNewerCount = 0;
+          this.divergentCloudNewerCount = 0;
+          this.updateDivergentStatusBar(0, 0);
+        })
+      );
+
       const statusBarItem = this.addStatusBarItem();
       this.statusBarElement = statusBarItem.createEl("span");
       this.statusBarElement.setAttribute("data-tooltip-position", "top");
@@ -1319,6 +1490,10 @@ export default class RemotelySavePlugin extends Plugin {
   async onunload() {
     console.info(`unloading plugin ${this.manifest.id}`);
     this.syncRibbon = undefined;
+    if (this.divergentDebounceTimer !== undefined) {
+      window.clearTimeout(this.divergentDebounceTimer);
+      this.divergentDebounceTimer = undefined;
+    }
     if (this.appContainerObserver !== undefined) {
       this.appContainerObserver.disconnect();
       this.appContainerObserver = undefined;
@@ -1417,6 +1592,9 @@ export default class RemotelySavePlugin extends Plugin {
     }
     if (this.settings.enableStatusBarInfo === undefined) {
       this.settings.enableStatusBarInfo = true;
+    }
+    if (this.settings.enableUnsyncedChangesIndicator === undefined) {
+      this.settings.enableUnsyncedChangesIndicator = true;
     }
     if (this.settings.syncOnSaveAfterMilliseconds === undefined) {
       this.settings.syncOnSaveAfterMilliseconds = -1;
@@ -2028,6 +2206,187 @@ export default class RemotelySavePlugin extends Plugin {
 
     this.statusBarElement.setText(lastSyncMsg);
     this.statusBarElement.setAttribute("aria-label", lastSyncLabelMsg);
+  }
+
+  async computeDivergentChangesCounts() {
+    if (!this.settings.enableUnsyncedChangesIndicator) {
+      return;
+    }
+    if (this.isSyncing) {
+      return;
+    }
+    const t = (x: TransItemType, vars?: any) => {
+      return this.i18n.t(x, vars);
+    };
+    let dryRunError: Error | undefined = undefined;
+    let fsEncrypt: FakeFsEncrypt | undefined = undefined;
+    try {
+      const profiler: Profiler | undefined = undefined;
+      const { fsLocal, fsRemote, fsEncrypt: fe } = this.createSyncFsStack(
+        profiler
+      );
+      fsEncrypt = fe;
+      const markIsSyncingFunc = (isSyncing: boolean) => {
+        this.isSyncing = isSyncing;
+      };
+      const errNotifyFunc = async (
+        _s: SyncTriggerSourceType,
+        error: Error
+      ) => {
+        dryRunError = error;
+        console.error(error);
+      };
+      const configSaver = async () => await this.saveSettings();
+      const getProtectError = (
+        protectModifyPercentage: number,
+        realModifyDeleteCount: number,
+        allFilesCount: number
+      ) => {
+        const percent = ((100 * realModifyDeleteCount) / allFilesCount).toFixed(
+          1
+        );
+        const res = t("syncrun_abort_protectmodifypercentage", {
+          protectModifyPercentage,
+          realModifyDeleteCount,
+          allFilesCount,
+          percent,
+        });
+        return res;
+      };
+
+      await syncer(
+        fsLocal,
+        fsRemote,
+        fsEncrypt,
+        profiler,
+        this.db,
+        "dry",
+        this.getCurrProfileID(),
+        this.vaultRandomID,
+        this.app.vault.configDir,
+        this.settings,
+        this.manifest.version,
+        configSaver,
+        getProtectError,
+        markIsSyncingFunc,
+        undefined,
+        errNotifyFunc,
+        undefined,
+        undefined,
+        undefined
+      );
+    } catch (error: any) {
+      console.error("computeDivergentChangesCounts failed", error);
+      return;
+    } finally {
+      fsEncrypt?.closeResources();
+    }
+
+    if (dryRunError !== undefined) {
+      // leave indicator unchanged on auth/network/password errors
+      return;
+    }
+
+    const plans = await readAllSyncPlanRecordTextsByVault(
+      this.db,
+      this.vaultRandomID
+    );
+    let localNewer = 0;
+    let cloudNewer = 0;
+    if (plans.length > 0) {
+      const latestPlan = plans[0];
+      let mappings: Record<string, MixedEntity> = {};
+      try {
+        mappings = JSON.parse(latestPlan) as Record<string, MixedEntity>;
+      } catch {
+        mappings = {};
+      }
+      for (const [key, entity] of Object.entries(mappings)) {
+        if (key === "/$@meta") {
+          continue;
+        }
+        if (!entity || !entity.change) {
+          continue;
+        }
+        const decision = entity.decision;
+        switch (decision) {
+          case "local_is_modified_then_push":
+          case "local_is_created_then_push":
+          case "conflict_created_then_keep_local":
+          case "conflict_modified_then_keep_local":
+            localNewer += 1;
+            break;
+          case "remote_is_modified_then_pull":
+          case "remote_is_created_then_pull":
+          case "conflict_created_then_keep_remote":
+          case "conflict_modified_then_keep_remote":
+            cloudNewer += 1;
+            break;
+          default:
+            break;
+        }
+      }
+    }
+
+    this.divergentLocalNewerCount = localNewer;
+    this.divergentCloudNewerCount = cloudNewer;
+    this.updateDivergentStatusBar(localNewer, cloudNewer);
+  }
+
+  updateDivergentStatusBar(localCount: number, cloudCount: number) {
+    if (this.divergentStatusBarElement === undefined) {
+      return;
+    }
+    const t = (x: TransItemType, vars?: any) => {
+      return this.i18n.t(x, vars);
+    };
+    this.divergentStatusBarElement.empty();
+
+    const localEl = this.divergentStatusBarElement.createEl("span", {
+      cls: `remotely-save-divergent-local${
+        localCount === 0 ? " remotely-save-divergent-zero" : ""
+      }`,
+      text: `↑ ${localCount}`,
+    });
+    localEl.setAttribute(
+      "aria-label",
+      t("statusbar_unsynced_local_newer", { count: String(localCount) })
+    );
+
+    const cloudEl = this.divergentStatusBarElement.createEl("span", {
+      cls: `remotely-save-divergent-cloud${
+        cloudCount === 0 ? " remotely-save-divergent-zero" : ""
+      }`,
+      text: `↓ ${cloudCount}`,
+    });
+    cloudEl.setAttribute(
+      "aria-label",
+      t("statusbar_unsynced_cloud_newer", { count: String(cloudCount) })
+    );
+
+    const text = `↑ ${localCount}  ↓ ${cloudCount}`;
+    this.divergentStatusBarElement.setAttribute("aria-label", text);
+    this.divergentStatusBarElement.toggleClass(
+      "remotely-save-divergent-empty",
+      false
+    );
+  }
+
+  _divergentOnSaveEvent = () => {
+    if (this.divergentDebounceTimer !== undefined) {
+      window.clearTimeout(this.divergentDebounceTimer);
+    }
+    this.divergentDebounceTimer = window.setTimeout(async () => {
+      this.divergentDebounceTimer = undefined;
+      await this.computeDivergentChangesCounts();
+    }, 1000 * 3);
+  }
+
+  async resolveConflicts(
+    conflicts: MixedEntity[]
+  ): Promise<Record<string, DecisionTypeForMixedEntity>> {
+    const modal = new RemotelySaveConflictModal(this, conflicts);
+    return await modal.openWithResult();
   }
 
   /**

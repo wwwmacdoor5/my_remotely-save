@@ -186,6 +186,8 @@ export interface RemotelySavePluginSettings {
 
   enableMobileStatusBar?: boolean;
 
+  enableUnsyncedChangesIndicator?: boolean;
+
   encryptionMethod?: CipherMethodType;
 
   profiler?: ProfilerConfig;

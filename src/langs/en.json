@@ -64,6 +64,10 @@
   "statusbar_lastsync_label": "on {{date}}",
   "statusbar_lastsync_never": "Never Synced",
   "statusbar_lastsync_never_label": "Never Synced before",
+  "statusbar_unsynced_local_newer": "{{count}} local file(s) newer than cloud (not yet pushed)",
+  "statusbar_unsynced_cloud_newer": "{{count}} cloud file(s) newer than local (not yet pulled)",
+  "settings_enable_unsynced_changes_indicator": "Show Unsynced Changes Indicator",
+  "settings_enable_unsynced_changes_indicator_desc": "Show a status bar indicator for local and cloud changes not yet synced. Requires listing remote files on each file change.",
 
   "modal_password_title": "Hold on and PLEASE READ ON...",
   "modal_password_shortdesc": "If the field is not empty, files would be encrypted locally before being uploaded.\nIf the field is empty, then files would be uploaded without encryption.",
@@ -381,6 +385,15 @@
   "syncalgov3_checkbox_requiremultidevupdate": "I understand I need to update the plugin ACROSS ALL DEVICES to make them work properly.",
   "syncalgov3_button_agree": "Agree",
   "syncalgov3_button_disagree": "Do Not Agree",
+
+  "conflict_resolution_title": "Sync Conflict Resolution",
+  "conflict_resolution_desc": "{{count}} file(s) have conflicts. Choose how to resolve each one before sync continues.",
+  "conflict_keep_local": "Keep Local Version",
+  "conflict_keep_remote": "Keep Remote Version",
+  "conflict_skip": "Skip This File",
+  "conflict_done": "Done",
+  "conflict_resolution_done_title": "Conflict Resolution Complete",
+  "conflict_resolution_done_desc": "All conflicts have been resolved. Sync will now continue.",
 
   "menu_check_file_stat": "Check file stats"
 }

@@ -2227,6 +2227,19 @@ export class RemotelySaveSettingTab extends PluginSettingTab {
     }
 
     new Setting(basicDiv)
+      .setName(t("settings_enable_unsynced_changes_indicator"))
+      .setDesc(t("settings_enable_unsynced_changes_indicator_desc"))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.enableUnsyncedChangesIndicator ?? true)
+          .onChange(async (val) => {
+            this.plugin.settings.enableUnsyncedChangesIndicator = val;
+            await this.plugin.saveSettings();
+            this.plugin.updateDivergentStatusBar(0, 0);
+          });
+      });
+
+    new Setting(basicDiv)
       .setName(t("settings_ignorepaths"))
       .setDesc(t("settings_ignorepaths_desc"))
       .setClass("ignorepaths-settings")
